@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <title>STRUDEL CONTROLLER v1</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Courier New', 'Consolas', monospace;
+            background: #000;
+            color: #0f0;
+            overflow-x: hidden;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            touch-action: pan-y;
+            overscroll-behavior: none;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding-bottom: 80px;
+        }
+
+        /* Header */
+        .header {
+            background: #000;
+            padding: 16px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 4px 0 0 #0f0;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 900;
+            color: #0f0;
+            letter-spacing: 3px;
+        }
+
+        .status {
+            margin-top: 8px;
+            font-size: 10px;
+            color: #0a0;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        /* Beat counter */
+        .beat-counter {
+            display: flex;
+            gap: 2px;
+            margin-top: 8px;
+            justify-content: center;
+        }
+
+        .beat {
+            width: 8px;
+            height: 8px;
+            background: #111;
+        }
+
+        .beat.active {
+            background: #0f0;
+            box-shadow: 0 0 8px #0f0;
+        }
+
+        /* Global Controls */
+        .global-controls {
+            background: #000;
+            padding: 16px;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .control-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 20px;
+            font-size: 16px;
+            font-weight: 900;
+            background: #000;
+            cursor: pointer;
+            transition: all 0.1s;
+            touch-action: manipulation;
+            text-transform: uppercase;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 2px;
+            position: relative;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: currentColor;
+            opacity: 0.1;
+            transition: opacity 0.1s;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn:active::before {
+            opacity: 0.3;
+        }
+
+        .btn-play {
+            color: #0f0;
+            box-shadow: inset 0 0 0 2px #0f0;
+        }
+
+        .btn-play.playing {
+            background: #0f0;
+            color: #000;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .btn-stop {
+            color: #f00;
+            box-shadow: inset 0 0 0 2px #f00;
+        }
+
+        .btn-preset {
+            padding: 12px;
+            font-size: 12px;
+            color: #ff0;
+            box-shadow: inset 0 0 0 2px #ff0;
+        }
+
+        .btn-preset.active {
+            background: #ff0;
+            color: #000;
+        }
+
+        /* Tempo Control */
+        .tempo-control {
+            background: #000;
+            padding: 16px;
+            margin-top: 12px;
+            box-shadow: 0 0 0 2px #0f0;
+        }
+
+        .tempo-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+        .bpm-display {
+            font-size: 24px;
+            color: #0f0;
+            font-weight: 900;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .tempo-slider {
+            width: 100%;
+            height: 40px;
+            background: #111;
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .tempo-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 40px;
+            height: 40px;
+            background: #0f0;
+            cursor: grab;
+            box-shadow: 0 0 12px #0f0;
+        }
+
+        .tempo-slider::-webkit-slider-thumb:active {
+            cursor: grabbing;
+        }
+
+        .tempo-slider::-moz-range-thumb {
+            width: 40px;
+            height: 40px;
+            background: #0f0;
+            cursor: grab;
+            border: none;
+            box-shadow: 0 0 12px #0f0;
+        }
+
+        /* Track Section */
+        .tracks {
+            padding: 16px;
+        }
+
+        .track {
+            background: #000;
+            margin-bottom: 12px;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .track::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            box-shadow: inset 0 0 0 2px #222;
+            pointer-events: none;
+            transition: box-shadow 0.2s;
+        }
+
+        .track.active::after {
+            box-shadow: inset 0 0 0 2px #0f0, 0 0 16px rgba(0, 255, 0, 0.3);
+        }
+
+        .track-header {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            background: #000;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .track-toggle {
+            width: 50px;
+            height: 50px;
+            background: #111;
+            position: relative;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+
+        .track-toggle::before {
+            content: '';
+            position: absolute;
+            inset: 8px;
+            background: #0f0;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .track-toggle.active::before {
+            opacity: 1;
+            box-shadow: 0 0 12px #0f0;
+        }
+
+        .track-info {
+            flex: 1;
+            margin-left: 16px;
+        }
+
+        .track-name {
+            font-size: 16px;
+            font-weight: 900;
+            margin-bottom: 4px;
+            color: #0f0;
+        }
+
+        .track-description {
+            font-size: 9px;
+            color: #0a0;
+            font-weight: bold;
+        }
+
+        .track-controls {
+            padding: 16px;
+            background: #050505;
+        }
+
+        .pattern-selector {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+
+        .pattern-btn {
+            flex: 1;
+            padding: 16px;
+            background: #000;
+            color: #666;
+            font-size: 14px;
+            font-weight: 900;
+            cursor: pointer;
+            transition: all 0.1s;
+            font-family: 'Courier New', monospace;
+            touch-action: manipulation;
+            position: relative;
+        }
+
+        .pattern-btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            box-shadow: inset 0 0 0 2px #222;
+            transition: all 0.1s;
+        }
+
+        .pattern-btn:active {
+            transform: scale(0.95);
+        }
+
+        .pattern-btn.selected {
+            background: #0f0;
+            color: #000;
+        }
+
+        .pattern-btn.selected::after {
+            box-shadow: inset 0 0 0 2px #0f0, 0 0 8px #0f0;
+        }
+
+        .control-group {
+            margin-bottom: 12px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 9px;
+            color: #0a0;
+            font-weight: 900;
+        }
+
+        .control-value {
+            color: #0f0;
+            font-size: 11px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .slider {
+            width: 100%;
+            height: 40px;
+            background: #111;
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 40px;
+            height: 40px;
+            background: #0f0;
+            cursor: grab;
+        }
+
+        .slider::-webkit-slider-thumb:active {
+            cursor: grabbing;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 40px;
+            height: 40px;
+            background: #0f0;
+            cursor: grab;
+            border: none;
+        }
+
+        /* Footer */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #000;
+            padding: 10px;
+            text-align: center;
+            font-size: 9px;
+            color: #0a0;
+            font-weight: bold;
+            box-shadow: 0 -4px 0 0 #0f0;
+        }
+
+        /* Utility */
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>STRUDEL v1</h1>
+            <div class="status" id="status">READY</div>
+            <div class="beat-counter" id="beatCounter"></div>
+        </div>
+
+        <!-- Global Controls -->
+        <div class="global-controls">
+            <div class="control-row">
+                <button class="btn btn-play" id="playBtn">▶ PLAY</button>
+                <button class="btn btn-stop" id="stopBtn">■ STOP</button>
+            </div>
+
+            <div class="control-row">
+                <button class="btn btn-preset" id="preset1" data-preset="1">P1</button>
+                <button class="btn btn-preset" id="preset2" data-preset="2">P2</button>
+                <button class="btn btn-preset" id="preset3" data-preset="3">P3</button>
+                <button class="btn btn-preset" id="preset4" data-preset="4">P4</button>
+            </div>
+
+            <div class="tempo-control">
+                <div class="tempo-label">
+                    <span>TEMPO</span>
+                    <span class="bpm-display" id="bpmDisplay">120</span>
+                </div>
+                <input type="range" class="tempo-slider" id="tempoSlider"
+                       min="60" max="180" value="120" step="1">
+            </div>
+        </div>
+
+        <!-- Tracks -->
+        <div class="tracks" id="tracks"></div>
+    </div>
+
+    <div class="footer">
+        STRUDEL CONTROLLER v1.0 // MOBILE OPTIMIZED
+    </div>
+
+    <script src="https://unpkg.com/@strudel/web@latest"></script>
+    <script>
+        // Configuration
+        const STEPS_PER_BAR = 16;
+        const DEBOUNCE_MS = 100;
+
+        // Track definitions
+        const trackDefinitions = [
+            {
+                id: 'drums',
+                name: 'DRUMS',
+                description: 'Kick & Snare',
+                patterns: {
+                    A: 'bd sd',
+                    B: 'bd bd sd ~',
+                    C: 'bd*2 ~ sd [bd sd]',
+                    D: 'bd ~ ~ sd bd ~ sd ~',
+                    E: '[bd bd] sd [bd sd] sd'
+                }
+            },
+            {
+                id: 'hihat',
+                name: 'HI-HATS',
+                description: 'Rhythmic hats',
+                patterns: {
+                    A: 'hh*4',
+                    B: 'hh*8',
+                    C: '~ hh hh ~',
+                    D: 'hh*2 ~ hh*2 hh',
+                    E: 'hh [hh hh] ~ hh*3'
+                }
+            },
+            {
+                id: 'bass',
+                name: 'BASS',
+                description: 'Low end groove',
+                patterns: {
+                    A: 'c2 e2 g2 c2',
+                    B: 'c2 ~ e2 g2',
+                    C: '<c2 e2 g2 a2>',
+                    D: 'c2 [e2 g2] ~ a2',
+                    E: 'c2*2 e2 [g2 a2] c3'
+                },
+                synth: 'sawtooth',
+                effect: (p) => p.lpf(200)
+            },
+            {
+                id: 'melody',
+                name: 'MELODY',
+                description: 'Lead synth',
+                patterns: {
+                    A: 'c4 e4 g4 c5',
+                    B: '<c4 e4 g4 c5>',
+                    C: '[c4 e4] g4 [g4 c5] e4',
+                    D: 'c4*2 [e4 g4] ~ c5',
+                    E: '<[c4 e4] g4 [g4 a4] c5>'
+                },
+                synth: 'triangle'
+            },
+            {
+                id: 'perc',
+                name: 'PERC',
+                description: 'Extra rhythm',
+                patterns: {
+                    A: '~ cp ~ cp',
+                    B: 'cp*2 ~ cp ~',
+                    C: 'oh*4',
+                    D: 'cp ~ oh cp',
+                    E: '[cp oh] ~ cp oh*2'
+                }
+            }
+        ];
+
+        // State
+        let strudelInitialized = false;
+        let isPlaying = false;
+        let currentBPM = 120;
+        let currentStep = 0;
+        let stepInterval = null;
+        let trackStates = {};
+        let cachedPatterns = new Map();
+        let debounceTimers = {};
+
+        // Initialize track states
+        trackDefinitions.forEach(track => {
+            trackStates[track.id] = {
+                enabled: false,
+                selectedPattern: 'A',
+                volume: 0.7,
+                speed: 1,
+                reverb: 0,
+                delay: 0,
+                degrade: 0
+            };
+        });
+
+        // DOM elements
+        const status = document.getElementById('status');
+        const playBtn = document.getElementById('playBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const tempoSlider = document.getElementById('tempoSlider');
+        const bpmDisplay = document.getElementById('bpmDisplay');
+        const tracksContainer = document.getElementById('tracks');
+        const beatCounter = document.getElementById('beatCounter');
+
+        // Utility: Haptic feedback
+        function haptic() {
+            if (navigator.vibrate) {
+                navigator.vibrate(10);
+            }
+        }
+
+        // Utility: Debounce
+        function debounce(key, fn, delay = DEBOUNCE_MS) {
+            clearTimeout(debounceTimers[key]);
+            debounceTimers[key] = setTimeout(fn, delay);
+        }
+
+        // Initialize beat counter
+        function initBeatCounter() {
+            beatCounter.innerHTML = '';
+            for (let i = 0; i < STEPS_PER_BAR; i++) {
+                const beat = document.createElement('div');
+                beat.className = 'beat';
+                beat.dataset.step = i;
+                beatCounter.appendChild(beat);
+            }
+        }
+
+        // Update beat counter
+        function updateBeatCounter(step) {
+            const beats = beatCounter.querySelectorAll('.beat');
+            beats.forEach((beat, i) => {
+                beat.classList.toggle('active', i === step);
+            });
+        }
+
+        // Initialize Strudel
+        async function initializeStrudel() {
+            if (!strudelInitialized) {
+                try {
+                    status.textContent = 'LOADING...';
+                    console.log('[INIT] Starting Strudel initialization');
+
+                    await window.initStrudel({
+                        prebake: () => samples('github:tidalcycles/dirt-samples')
+                    });
+
+                    strudelInitialized = true;
+                    status.textContent = 'READY';
+                    console.log('[INIT] ✓ Strudel initialized');
+                    return true;
+                } catch (error) {
+                    status.textContent = 'ERROR: ' + error.message.toUpperCase();
+                    console.error('[INIT] Error:', error);
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // Build pattern with caching
+        function buildPattern(track, state) {
+            const cacheKey = `${track.id}-${state.selectedPattern}-${state.volume}-${state.speed}-${state.reverb}-${state.delay}-${state.degrade}`;
+
+            // Return cached if available
+            if (cachedPatterns.has(cacheKey)) {
+                return cachedPatterns.get(cacheKey);
+            }
+
+            try {
+                const patternString = track.patterns[state.selectedPattern];
+                let pattern;
+
+                if (track.synth) {
+                    pattern = window.note(patternString).s(track.synth);
+                    if (track.effect) {
+                        pattern = track.effect(pattern);
+                    }
+                } else {
+                    pattern = window.sound(patternString);
+                }
+
+                // Apply modifiers
+                if (state.speed !== 1) {
+                    pattern = state.speed > 1 ? pattern.fast(state.speed) : pattern.slow(1 / state.speed);
+                }
+
+                if (state.reverb > 0) pattern = pattern.room(state.reverb);
+                if (state.delay > 0) pattern = pattern.delay(state.delay);
+                if (state.degrade > 0) pattern = pattern.degrade(state.degrade);
+
+                pattern = pattern.gain(state.volume).cpm(currentBPM / 4);
+
+                // Cache the pattern
+                cachedPatterns.set(cacheKey, pattern);
+                return pattern;
+            } catch (error) {
+                console.error(`[PATTERN] Error building ${track.id}:`, error);
+                return null;
+            }
+        }
+
+        // Update patterns (optimized)
+        function updatePatterns() {
+            if (!isPlaying || !strudelInitialized) return;
+
+            try {
+                if (typeof window.hush === 'function') {
+                    window.hush();
+                }
+
+                const patterns = [];
+                let activeCount = 0;
+
+                trackDefinitions.forEach(track => {
+                    const state = trackStates[track.id];
+                    if (state.enabled) {
+                        const pattern = buildPattern(track, state);
+                        if (pattern) {
+                            patterns.push(pattern);
+                            activeCount++;
+                        }
+                    }
+                });
+
+                if (patterns.length > 0) {
+                    window.stack(...patterns).play();
+                    status.textContent = `PLAYING ${activeCount} TRACK${activeCount > 1 ? 'S' : ''}`;
+                } else {
+                    status.textContent = 'NO ACTIVE TRACKS';
+                }
+            } catch (error) {
+                console.error('[PLAYBACK] Error:', error);
+                status.textContent = 'PLAYBACK ERROR';
+            }
+        }
+
+        // Step clock
+        function startStepClock() {
+            if (stepInterval) clearInterval(stepInterval);
+
+            const stepDuration = (60000 / currentBPM) / 4; // 16th notes
+
+            stepInterval = setInterval(() => {
+                currentStep = (currentStep + 1) % STEPS_PER_BAR;
+                updateBeatCounter(currentStep);
+
+                if (currentStep === 0) {
+                    updatePatterns();
+                }
+            }, stepDuration);
+        }
+
+        function stopStepClock() {
+            if (stepInterval) {
+                clearInterval(stepInterval);
+                stepInterval = null;
+            }
+        }
+
+        // Generate track UI
+        function generateTrackUI() {
+            tracksContainer.innerHTML = '';
+
+            trackDefinitions.forEach(track => {
+                const state = trackStates[track.id];
+                const trackEl = document.createElement('div');
+                trackEl.className = 'track' + (state.enabled ? ' active' : '');
+                trackEl.id = `track-${track.id}`;
+
+                trackEl.innerHTML = `
+                    <div class="track-header" data-track="${track.id}">
+                        <div class="track-toggle ${state.enabled ? 'active' : ''}"
+                             data-track="${track.id}"></div>
+                        <div class="track-info">
+                            <div class="track-name">${track.name}</div>
+                            <div class="track-description">${track.description}</div>
+                        </div>
+                    </div>
+                    <div class="track-controls ${state.enabled ? '' : 'hidden'}">
+                        <div class="pattern-selector">
+                            ${['A', 'B', 'C', 'D', 'E'].map(p => `
+                                <button class="pattern-btn ${state.selectedPattern === p ? 'selected' : ''}"
+                                        data-track="${track.id}" data-pattern="${p}">${p}</button>
+                            `).join('')}
+                        </div>
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>VOLUME</span>
+                                <span class="control-value" id="vol-${track.id}">${(state.volume * 100).toFixed(0)}</span>
+                            </div>
+                            <input type="range" class="slider volume-slider"
+                                   data-track="${track.id}"
+                                   min="0" max="1" step="0.01" value="${state.volume}">
+                        </div>
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>SPEED</span>
+                                <span class="control-value" id="speed-${track.id}">${state.speed.toFixed(2)}</span>
+                            </div>
+                            <input type="range" class="slider"
+                                   data-track="${track.id}" data-effect="speed"
+                                   min="0.25" max="4" step="0.25" value="${state.speed}">
+                        </div>
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>REVERB</span>
+                                <span class="control-value" id="reverb-${track.id}">${(state.reverb * 100).toFixed(0)}</span>
+                            </div>
+                            <input type="range" class="slider"
+                                   data-track="${track.id}" data-effect="reverb"
+                                   min="0" max="1" step="0.01" value="${state.reverb}">
+                        </div>
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>DELAY</span>
+                                <span class="control-value" id="delay-${track.id}">${(state.delay * 100).toFixed(0)}</span>
+                            </div>
+                            <input type="range" class="slider"
+                                   data-track="${track.id}" data-effect="delay"
+                                   min="0" max="0.5" step="0.01" value="${state.delay}">
+                        </div>
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>CRUSH</span>
+                                <span class="control-value" id="degrade-${track.id}">${(state.degrade * 100).toFixed(0)}</span>
+                            </div>
+                            <input type="range" class="slider"
+                                   data-track="${track.id}" data-effect="degrade"
+                                   min="0" max="1" step="0.01" value="${state.degrade}">
+                        </div>
+                    </div>
+                `;
+
+                tracksContainer.appendChild(trackEl);
+            });
+
+            attachTrackListeners();
+        }
+
+        // Attach event listeners
+        function attachTrackListeners() {
+            // Track headers (toggle)
+            document.querySelectorAll('.track-header').forEach(header => {
+                header.addEventListener('click', async (e) => {
+                    if (!strudelInitialized) await initializeStrudel();
+
+                    const trackId = header.dataset.track;
+                    const state = trackStates[trackId];
+                    state.enabled = !state.enabled;
+
+                    haptic();
+                    cachedPatterns.clear(); // Clear cache on state change
+                    generateTrackUI();
+
+                    if (isPlaying) {
+                        updatePatterns();
+                    }
+                });
+            });
+
+            // Pattern buttons
+            document.querySelectorAll('.pattern-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const trackId = btn.dataset.track;
+                    const pattern = btn.dataset.pattern;
+
+                    trackStates[trackId].selectedPattern = pattern;
+                    haptic();
+                    cachedPatterns.clear();
+                    generateTrackUI();
+
+                    if (isPlaying) {
+                        debounce('pattern-' + trackId, updatePatterns, 50);
+                    }
+                });
+            });
+
+            // Volume sliders
+            document.querySelectorAll('.volume-slider').forEach(slider => {
+                slider.addEventListener('input', (e) => {
+                    const trackId = slider.dataset.track;
+                    const value = parseFloat(slider.value);
+                    trackStates[trackId].volume = value;
+
+                    document.getElementById(`vol-${trackId}`).textContent = (value * 100).toFixed(0);
+
+                    if (isPlaying) {
+                        debounce('volume-' + trackId, () => {
+                            cachedPatterns.clear();
+                            updatePatterns();
+                        });
+                    }
+                });
+            });
+
+            // Effect sliders
+            document.querySelectorAll('.slider[data-effect]').forEach(slider => {
+                slider.addEventListener('input', (e) => {
+                    const trackId = slider.dataset.track;
+                    const effect = slider.dataset.effect;
+                    const value = parseFloat(slider.value);
+
+                    trackStates[trackId][effect] = value;
+
+                    const displayValue = effect === 'speed' ? value.toFixed(2) : (value * 100).toFixed(0);
+                    document.getElementById(`${effect}-${trackId}`).textContent = displayValue;
+
+                    if (isPlaying) {
+                        debounce('effect-' + trackId + '-' + effect, () => {
+                            cachedPatterns.clear();
+                            updatePatterns();
+                        });
+                    }
+                });
+            });
+        }
+
+        // Play button
+        playBtn.addEventListener('click', async () => {
+            if (!await initializeStrudel()) return;
+
+            isPlaying = true;
+            playBtn.classList.add('playing');
+            playBtn.textContent = '⏸ PAUSE';
+
+            haptic();
+            currentStep = 0;
+            updateBeatCounter(0);
+            updatePatterns();
+            startStepClock();
+        });
+
+        // Stop button
+        stopBtn.addEventListener('click', () => {
+            isPlaying = false;
+            playBtn.classList.remove('playing');
+            playBtn.textContent = '▶ PLAY';
+            status.textContent = 'STOPPED';
+
+            haptic();
+            stopStepClock();
+            updateBeatCounter(-1);
+
+            if (strudelInitialized && typeof window.hush === 'function') {
+                window.hush();
+            }
+        });
+
+        // Tempo slider
+        tempoSlider.addEventListener('input', () => {
+            currentBPM = parseInt(tempoSlider.value);
+            bpmDisplay.textContent = currentBPM;
+
+            if (strudelInitialized && isPlaying) {
+                debounce('tempo', () => {
+                    cachedPatterns.clear();
+                    stopStepClock();
+                    updatePatterns();
+                    startStepClock();
+                }, 200);
+            }
+        });
+
+        // Preset system
+        document.querySelectorAll('.btn-preset').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const presetNum = btn.dataset.preset;
+                haptic();
+
+                // Long press to save, quick tap to load
+                let pressStart = Date.now();
+
+                btn.addEventListener('touchend', () => {
+                    const duration = Date.now() - pressStart;
+                    if (duration > 500) {
+                        savePreset(presetNum);
+                    } else {
+                        loadPreset(presetNum);
+                    }
+                }, { once: true });
+            });
+        });
+
+        function savePreset(num) {
+            try {
+                localStorage.setItem(`preset${num}`, JSON.stringify({
+                    bpm: currentBPM,
+                    tracks: trackStates
+                }));
+                status.textContent = `SAVED PRESET ${num}`;
+                setTimeout(() => status.textContent = 'READY', 1000);
+            } catch (e) {
+                console.error('[PRESET] Save error:', e);
+            }
+        }
+
+        function loadPreset(num) {
+            try {
+                const data = localStorage.getItem(`preset${num}`);
+                if (data) {
+                    const preset = JSON.parse(data);
+                    currentBPM = preset.bpm;
+                    trackStates = preset.tracks;
+
+                    bpmDisplay.textContent = currentBPM;
+                    tempoSlider.value = currentBPM;
+
+                    cachedPatterns.clear();
+                    generateTrackUI();
+
+                    if (isPlaying) updatePatterns();
+
+                    status.textContent = `LOADED PRESET ${num}`;
+                    setTimeout(() => status.textContent = 'READY', 1000);
+                }
+            } catch (e) {
+                console.error('[PRESET] Load error:', e);
+            }
+        }
+
+        // Initialize
+        initBeatCounter();
+        generateTrackUI();
+
+        console.log('[APP] Strudel Controller v1 initialized');
+    </script>
+</body>
+</html>

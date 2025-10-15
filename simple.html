@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Simple Strudel Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #00ff00;
+            text-align: center;
+        }
+
+        button {
+            padding: 20px 40px;
+            margin: 10px;
+            font-size: 20px;
+            background: #333;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            border-radius: 8px;
+            cursor: pointer;
+            min-width: 200px;
+            touch-action: manipulation;
+        }
+
+        button:active {
+            background: #00ff00;
+            color: #1a1a1a;
+            transform: scale(0.95);
+        }
+
+        #status {
+            margin: 20px;
+            padding: 15px;
+            background: #2a2a2a;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 Simple Strudel Test</h1>
+    <div id="status">Click a button to test audio</div>
+
+    <button id="play1">Play Sound 1</button>
+    <button id="play2">Play Sound 2</button>
+    <button id="play3">Play Sound 3</button>
+    <button id="stop">Stop</button>
+
+    <!-- Load Strudel from CDN -->
+    <script src="https://unpkg.com/@strudel/web@latest"></script>
+
+    <script>
+        const status = document.getElementById('status');
+        let initialized = false;
+
+        async function init() {
+            if (!initialized) {
+                try {
+                    status.textContent = '⏳ Initializing audio and loading samples...';
+                    console.log('Calling initStrudel() with sample loading...');
+
+                    // Initialize Strudel with sample loading
+                    await initStrudel({
+                        prebake: () => samples('github:tidalcycles/dirt-samples')
+                    });
+
+                    initialized = true;
+                    status.textContent = '✅ Audio and samples loaded! Ready to play.';
+                    console.log('Strudel initialized successfully with samples');
+                    return true;
+                } catch (error) {
+                    status.textContent = '❌ Error: ' + error.message;
+                    console.error('Initialization error:', error);
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        document.getElementById('play1').addEventListener('click', async () => {
+            if (await init()) {
+                status.textContent = '🔊 Playing: bd hh sd hh (drums)';
+                console.log('Playing sound 1 - drums');
+                try {
+                    sound("bd hh sd hh").play();
+                } catch (e) {
+                    status.textContent = '❌ Play error: ' + e.message;
+                    console.error('Play error:', e);
+                }
+            }
+        });
+
+        document.getElementById('play2').addEventListener('click', async () => {
+            if (await init()) {
+                status.textContent = '🔊 Playing: c a f e (synth notes)';
+                console.log('Playing sound 2 - synth');
+                try {
+                    note("c a f e").play();
+                } catch (e) {
+                    status.textContent = '❌ Play error: ' + e.message;
+                    console.error('Play error:', e);
+                }
+            }
+        });
+
+        document.getElementById('play3').addEventListener('click', async () => {
+            if (await init()) {
+                status.textContent = '🔊 Playing: bd*2 sd (fast drums)';
+                console.log('Playing sound 3 - fast drums');
+                try {
+                    sound("bd*2 sd").play();
+                } catch (e) {
+                    status.textContent = '❌ Play error: ' + e.message;
+                    console.error('Play error:', e);
+                }
+            }
+        });
+
+        document.getElementById('stop').addEventListener('click', async () => {
+            console.log('Stopping all sounds');
+            try {
+                if (typeof hush !== 'undefined') {
+                    hush();
+                    status.textContent = '⏹️ Stopped';
+                } else {
+                    status.textContent = '⚠️ Hush function not available';
+                }
+            } catch (e) {
+                status.textContent = '❌ Stop error: ' + e.message;
+                console.error('Stop error:', e);
+            }
+        });
+
+        console.log('Page loaded. Click a button to start.');
+        console.log('Browser:', navigator.userAgent);
+        console.log('Audio context support:', 'AudioContext' in window || 'webkitAudioContext' in window);
+    </script>
+</body>
+</html>

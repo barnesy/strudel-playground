@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Strudel Playground</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+        }
+
+        h1 {
+            text-align: center;
+            color: #00ff00;
+        }
+
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 15px 25px;
+            margin: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            background: #333;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            border-radius: 8px;
+            min-width: 140px;
+            min-height: 50px;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: rgba(0, 255, 0, 0.3);
+        }
+
+        button:hover {
+            background: #00ff00;
+            color: #1a1a1a;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .info {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #2a2a2a;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+        }
+
+        pre {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+
+        code {
+            color: #ffff00;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 Strudel Playground 🎵</h1>
+
+    <div class="controls">
+        <div id="status" style="margin: 10px; padding: 10px; background: #2a2a2a; border: 1px solid #00ff00; border-radius: 4px; font-size: 14px;">
+            👆 Tap any button to start audio
+        </div>
+        <button id="example1">Play Example 1</button>
+        <button id="example2">Play Example 2</button>
+        <button id="example3">Play Example 3</button>
+        <button id="example4">Play Example 4</button>
+        <button id="stop">Stop All</button>
+    </div>
+
+    <div class="info">
+        <h2>Welcome to Strudel!</h2>
+        <p>Strudel is a live coding music environment. Click the buttons above to play different musical patterns.</p>
+
+        <h3>Examples:</h3>
+        <ul>
+            <li><strong>Example 1:</strong> Simple drum pattern</li>
+            <li><strong>Example 2:</strong> Melodic pattern with chords</li>
+            <li><strong>Example 3:</strong> Complex rhythm with effects</li>
+            <li><strong>Example 4:</strong> Bass line with modulation</li>
+        </ul>
+
+        <h3>Quick Start:</h3>
+        <p>Open the browser console and try:</p>
+        <pre><code>note("c a f e").play()</code></pre>
+        <pre><code>sound("bd hh sd hh").play()</code></pre>
+
+        <p>Check <code>main.js</code> to see the code and experiment with your own patterns!</p>
+    </div>
+
+    <script type="module" src="/main.js"></script>
+</body>
+</html>

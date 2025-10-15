@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strudel Mobile UX - Simplified</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: monospace;
+            background: #0a0a0a;
+            color: #00ff88;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .status {
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid #00ff88;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+
+        .sequencer {
+            margin-bottom: 30px;
+        }
+
+        .track {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #00ff8833;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+        }
+
+        .track-name {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .step-grid {
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            gap: 4px;
+        }
+
+        .step {
+            aspect-ratio: 1;
+            background: #1a1a1a;
+            border: 2px solid #333;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .step.active {
+            background: #00ff88;
+            border-color: #00ff88;
+            box-shadow: 0 0 8px #00ff8888;
+        }
+
+        .transport {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #000;
+            border-top: 2px solid #00ff88;
+            padding: 16px;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            background: none;
+            border: 2px solid #00ff88;
+            color: #00ff88;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:active {
+            background: #00ff88;
+            color: #000;
+        }
+
+        .btn.active {
+            background: #00ff88;
+            color: #000;
+        }
+
+        .error {
+            background: rgba(255, 0, 0, 0.2);
+            border: 1px solid #ff0044;
+            color: #ff0044;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎵 STRUDEL MOBILE</h1>
+    </div>
+
+    <div class="status" id="status">Loading Strudel...</div>
+    <div id="error" class="error" style="display: none;"></div>
+
+    <div class="sequencer">
+        <div class="track">
+            <div class="track-name">KICK</div>
+            <div class="step-grid" id="kick-grid"></div>
+        </div>
+
+        <div class="track">
+            <div class="track-name">SNARE</div>
+            <div class="step-grid" id="snare-grid"></div>
+        </div>
+
+        <div class="track">
+            <div class="track-name">HIHAT</div>
+            <div class="step-grid" id="hihat-grid"></div>
+        </div>
+    </div>
+
+    <div class="transport">
+        <button class="btn" id="playBtn">▶ PLAY</button>
+        <button class="btn" id="stopBtn">■ STOP</button>
+    </div>
+
+    <script type="module">
+        try {
+            // Status update
+            const statusEl = document.getElementById('status');
+            const errorEl = document.getElementById('error');
+
+            function showError(msg) {
+                errorEl.textContent = msg;
+                errorEl.style.display = 'block';
+                console.error(msg);
+            }
+
+            function showStatus(msg) {
+                statusEl.textContent = msg;
+                console.log(msg);
+            }
+
+            showStatus('Importing Strudel modules...');
+
+            // Import Strudel
+            const { evalScope, Pattern } = await import('https://esm.sh/@strudel/core@1.2.4');
+            const { getAudioContext, webaudioOutput, initAudioOnFirstClick } = await import('https://esm.sh/@strudel/webaudio@1.2.5');
+
+            showStatus('Initializing audio context...');
+
+            // Initialize audio on first interaction
+            await initAudioOnFirstClick();
+            const audioContext = getAudioContext();
+
+            showStatus('Strudel loaded successfully! Click PLAY to start.');
+
+            let currentPattern = null;
+
+            // State
+            const state = {
+                tracks: {
+                    kick: [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],
+                    snare: [0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0],
+                    hihat: [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0]
+                },
+                isPlaying: false
+            };
+
+            // Render step grids
+            function renderGrid(trackId) {
+                const container = document.getElementById(`${trackId}-grid`);
+                const pattern = state.tracks[trackId];
+
+                container.innerHTML = '';
+                pattern.forEach((val, idx) => {
+                    const step = document.createElement('div');
+                    step.className = `step ${val === 1 ? 'active' : ''}`;
+                    step.dataset.track = trackId;
+                    step.dataset.step = idx;
+                    container.appendChild(step);
+                });
+            }
+
+            renderGrid('kick');
+            renderGrid('snare');
+            renderGrid('hihat');
+
+            // Step toggle
+            document.addEventListener('click', (e) => {
+                if (e.target.classList.contains('step')) {
+                    const track = e.target.dataset.track;
+                    const step = parseInt(e.target.dataset.step);
+                    state.tracks[track][step] = state.tracks[track][step] === 0 ? 1 : 0;
+                    renderGrid(track);
+                    showStatus(`Toggled ${track} step ${step + 1}`);
+                }
+            });
+
+            // Generate pattern
+            function generatePattern() {
+                const patterns = [];
+
+                // Kick
+                const kickPat = state.tracks.kick.map(v => v === 1 ? 'bd' : '~').join(' ');
+                patterns.push(`sound("${kickPat}")`);
+
+                // Snare
+                const snarePat = state.tracks.snare.map(v => v === 1 ? 'sd' : '~').join(' ');
+                patterns.push(`sound("${snarePat}")`);
+
+                // Hihat
+                const hihatPat = state.tracks.hihat.map(v => v === 1 ? 'hh' : '~').join(' ');
+                patterns.push(`sound("${hihatPat}").gain(0.6)`);
+
+                return `stack(${patterns.join(', ')})`;
+            }
+
+            // Play/Stop
+            document.getElementById('playBtn').addEventListener('click', async () => {
+                if (state.isPlaying) return;
+
+                try {
+                    const patternCode = generatePattern();
+                    showStatus('Playing: ' + patternCode.substring(0, 50) + '...');
+
+                    // Evaluate the pattern
+                    const pattern = await evalScope(patternCode);
+
+                    // Play the pattern
+                    currentPattern = pattern.onTrigger((time, hap) => {
+                        try {
+                            webaudioOutput(hap, time, hap.duration, audioContext);
+                        } catch (e) {
+                            console.error('Audio output error:', e);
+                        }
+                    });
+
+                    // Start playback
+                    const cps = 120 / 60; // 120 BPM to cycles per second
+                    currentPattern.query(0, 100, cps);
+
+                    state.isPlaying = true;
+                    document.getElementById('playBtn').classList.add('active');
+                } catch (error) {
+                    showError('Play error: ' + error.message);
+                    console.error('Full error:', error);
+                }
+            });
+
+            document.getElementById('stopBtn').addEventListener('click', () => {
+                if (currentPattern) {
+                    currentPattern = null;
+                }
+                state.isPlaying = false;
+                document.getElementById('playBtn').classList.remove('active');
+                showStatus('Stopped');
+            });
+
+            console.log('✅ Everything loaded successfully!');
+            console.log('State:', state);
+
+        } catch (error) {
+            const errorEl = document.getElementById('error');
+            errorEl.textContent = 'Error: ' + error.message + ' - Check console for details';
+            errorEl.style.display = 'block';
+            console.error('Fatal error:', error);
+            console.error('Stack:', error.stack);
+        }
+    </script>
+</body>
+</html>

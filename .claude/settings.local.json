@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev)",
+      "WebFetch(domain:strudel.cc)",
+      "Bash(node:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(lsof:*)",
+      "Bash(npm search:*)",
+      "Bash(npm install:*)",
+      "Bash(PUPPETEER_SKIP_DOWNLOAD=true npm install -g @hisma/server-puppeteer)",
+      "Bash(mcp-server-puppeteer:*)",
+      "Read(//data/data/com.termux/files/usr/lib/node_modules/@hisma/server-puppeteer/dist/**)",
+      "Bash(npm info:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

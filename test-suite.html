@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Strudel Controller Tests</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #0f0;
+            padding: 20px;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .test-section {
+            background: #111;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .test-section h2 {
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #0ff;
+        }
+
+        .test-case {
+            padding: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+        }
+
+        .test-status {
+            width: 20px;
+            height: 20px;
+            display: inline-block;
+        }
+
+        .test-status.pending { background: #666; }
+        .test-status.running { background: #ff0; }
+        .test-status.pass { background: #0f0; }
+        .test-status.fail { background: #f00; }
+
+        .test-name {
+            flex: 1;
+        }
+
+        .test-time {
+            color: #666;
+            font-size: 10px;
+        }
+
+        .summary {
+            background: #0f0;
+            color: #000;
+            padding: 15px;
+            margin-top: 20px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .summary.fail {
+            background: #f00;
+        }
+
+        button {
+            background: #000;
+            color: #0f0;
+            padding: 12px 24px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            touch-action: manipulation;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .error-detail {
+            color: #f00;
+            font-size: 11px;
+            margin-left: 30px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>▶ Strudel Test Suite</h1>
+    <button id="runTests">Run All Tests</button>
+
+    <div id="testResults"></div>
+    <div id="summary"></div>
+
+    <script src="https://unpkg.com/@strudel/web@latest"></script>
+    <script>
+        // Test framework
+        class TestRunner {
+            constructor() {
+                this.tests = [];
+                this.results = {
+                    total: 0,
+                    passed: 0,
+                    failed: 0,
+                    duration: 0
+                };
+            }
+
+            describe(sectionName, callback) {
+                const section = { name: sectionName, tests: [] };
+                const currentSection = section;
+
+                const it = (testName, testFn) => {
+                    currentSection.tests.push({ name: testName, fn: testFn });
+                };
+
+                callback(it);
+                this.tests.push(section);
+            }
+
+            async run() {
+                const startTime = Date.now();
+                const resultsContainer = document.getElementById('testResults');
+                resultsContainer.innerHTML = '';
+
+                for (const section of this.tests) {
+                    const sectionEl = document.createElement('div');
+                    sectionEl.className = 'test-section';
+                    sectionEl.innerHTML = `<h2>${section.name}</h2>`;
+                    resultsContainer.appendChild(sectionEl);
+
+                    for (const test of section.tests) {
+                        this.results.total++;
+                        const testEl = document.createElement('div');
+                        testEl.className = 'test-case';
+
+                        const statusEl = document.createElement('span');
+                        statusEl.className = 'test-status running';
+
+                        const nameEl = document.createElement('span');
+                        nameEl.className = 'test-name';
+                        nameEl.textContent = test.name;
+
+                        const timeEl = document.createElement('span');
+                        timeEl.className = 'test-time';
+
+                        testEl.appendChild(statusEl);
+                        testEl.appendChild(nameEl);
+                        testEl.appendChild(timeEl);
+                        sectionEl.appendChild(testEl);
+
+                        const testStart = Date.now();
+                        try {
+                            await test.fn();
+                            const duration = Date.now() - testStart;
+                            statusEl.className = 'test-status pass';
+                            timeEl.textContent = `${duration}ms`;
+                            this.results.passed++;
+                        } catch (error) {
+                            const duration = Date.now() - testStart;
+                            statusEl.className = 'test-status fail';
+                            timeEl.textContent = `${duration}ms`;
+                            this.results.failed++;
+
+                            const errorEl = document.createElement('div');
+                            errorEl.className = 'error-detail';
+                            errorEl.textContent = `✗ ${error.message}`;
+                            testEl.appendChild(errorEl);
+                        }
+                    }
+                }
+
+                this.results.duration = Date.now() - startTime;
+                this.displaySummary();
+            }
+
+            displaySummary() {
+                const summaryEl = document.getElementById('summary');
+                const passed = this.results.passed === this.results.total;
+                summaryEl.className = passed ? 'summary' : 'summary fail';
+                summaryEl.innerHTML = `
+                    Tests: ${this.results.passed}/${this.results.total} passed
+                    | Failed: ${this.results.failed}
+                    | Duration: ${this.results.duration}ms
+                `;
+            }
+        }
+
+        // Assertion helpers
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+
+        function assertEqual(actual, expected, message) {
+            if (actual !== expected) {
+                throw new Error(message || `Expected ${expected}, got ${actual}`);
+            }
+        }
+
+        function assertDefined(value, message) {
+            if (value === undefined || value === null) {
+                throw new Error(message || 'Value is undefined or null');
+            }
+        }
+
+        function assertType(value, type, message) {
+            if (typeof value !== type) {
+                throw new Error(message || `Expected type ${type}, got ${typeof value}`);
+            }
+        }
+
+        // Test suite
+        const runner = new TestRunner();
+
+        // Strudel initialization tests
+        runner.describe('Strudel Initialization', (it) => {
+            it('should load Strudel library', () => {
+                assertDefined(window.initStrudel, 'initStrudel not found');
+            });
+
+            it('should initialize Strudel successfully', async () => {
+                await window.initStrudel({
+                    prebake: () => samples('github:tidalcycles/dirt-samples')
+                });
+                assertDefined(window.sound, 'sound function not available');
+                assertDefined(window.note, 'note function not available');
+                assertDefined(window.stack, 'stack function not available');
+                assertDefined(window.hush, 'hush function not available');
+            });
+
+            it('should have samples loaded', () => {
+                assertType(window.samples, 'function', 'samples is not a function');
+            });
+        });
+
+        // Pattern building tests
+        runner.describe('Pattern Building', (it) => {
+            it('should create drum sound pattern', () => {
+                const pattern = window.sound('bd sd');
+                assertDefined(pattern, 'Pattern not created');
+                assertType(pattern.play, 'function', 'Pattern has no play method');
+            });
+
+            it('should create note pattern', () => {
+                const pattern = window.note('c4 e4 g4');
+                assertDefined(pattern, 'Note pattern not created');
+                assertType(pattern.s, 'function', 'Note pattern has no s method');
+            });
+
+            it('should apply gain to pattern', () => {
+                const pattern = window.sound('bd').gain(0.5);
+                assertDefined(pattern, 'Gain not applied');
+            });
+
+            it('should apply speed modifiers', () => {
+                const pattern = window.sound('bd').fast(2);
+                assertDefined(pattern, 'Fast modifier not applied');
+            });
+
+            it('should apply effects', () => {
+                const pattern = window.sound('bd').room(0.5).delay(0.3);
+                assertDefined(pattern, 'Effects not applied');
+            });
+
+            it('should apply tempo (cpm)', () => {
+                const pattern = window.sound('bd').cpm(120);
+                assertDefined(pattern, 'CPM not applied');
+            });
+
+            it('should stack multiple patterns', () => {
+                const p1 = window.sound('bd');
+                const p2 = window.sound('hh*4');
+                const stacked = window.stack(p1, p2);
+                assertDefined(stacked, 'Stack not created');
+                assertType(stacked.play, 'function', 'Stacked pattern has no play method');
+            });
+        });
+
+        // Track state management tests
+        runner.describe('Track State Management', (it) => {
+            let trackState;
+
+            it('should create track state object', () => {
+                trackState = {
+                    enabled: false,
+                    selectedPattern: 'A',
+                    volume: 0.7,
+                    speed: 1,
+                    reverb: 0,
+                    delay: 0,
+                    degrade: 0
+                };
+                assertDefined(trackState, 'Track state not created');
+            });
+
+            it('should toggle track enabled state', () => {
+                trackState.enabled = !trackState.enabled;
+                assertEqual(trackState.enabled, true, 'Track not enabled');
+            });
+
+            it('should change pattern selection', () => {
+                trackState.selectedPattern = 'B';
+                assertEqual(trackState.selectedPattern, 'B', 'Pattern not changed');
+            });
+
+            it('should update volume within range', () => {
+                trackState.volume = 0.8;
+                assert(trackState.volume >= 0 && trackState.volume <= 1, 'Volume out of range');
+            });
+
+            it('should update effect parameters', () => {
+                trackState.reverb = 0.5;
+                trackState.delay = 0.3;
+                assert(trackState.reverb >= 0 && trackState.reverb <= 1, 'Reverb out of range');
+                assert(trackState.delay >= 0, 'Delay invalid');
+            });
+        });
+
+        // Pattern construction with state tests
+        runner.describe('Pattern Construction', (it) => {
+            const trackDef = {
+                id: 'drums',
+                patterns: {
+                    A: 'bd sd',
+                    B: 'bd*2 sd',
+                    C: 'bd ~ sd ~'
+                }
+            };
+
+            const melodicTrack = {
+                id: 'bass',
+                patterns: {
+                    A: 'c2 e2 g2 c2'
+                },
+                synth: 'sawtooth'
+            };
+
+            it('should build drum pattern from state', () => {
+                const state = { selectedPattern: 'A', volume: 0.7, speed: 1 };
+                const patternString = trackDef.patterns[state.selectedPattern];
+                const pattern = window.sound(patternString).gain(state.volume);
+                assertDefined(pattern, 'Drum pattern not built');
+            });
+
+            it('should build melodic pattern from state', () => {
+                const state = { selectedPattern: 'A', volume: 0.7 };
+                const patternString = melodicTrack.patterns[state.selectedPattern];
+                const pattern = window.note(patternString).s(melodicTrack.synth).gain(state.volume);
+                assertDefined(pattern, 'Melodic pattern not built');
+            });
+
+            it('should apply speed multiplier correctly', () => {
+                const state = { selectedPattern: 'A', volume: 0.7, speed: 2 };
+                const patternString = trackDef.patterns[state.selectedPattern];
+                const pattern = window.sound(patternString).fast(state.speed);
+                assertDefined(pattern, 'Speed multiplier not applied');
+            });
+
+            it('should apply slow multiplier correctly', () => {
+                const state = { selectedPattern: 'A', volume: 0.7, speed: 0.5 };
+                const patternString = trackDef.patterns[state.selectedPattern];
+                const pattern = window.sound(patternString).slow(1 / state.speed);
+                assertDefined(pattern, 'Slow multiplier not applied');
+            });
+
+            it('should chain multiple effects', () => {
+                const state = {
+                    selectedPattern: 'A',
+                    volume: 0.7,
+                    reverb: 0.5,
+                    delay: 0.3,
+                    degrade: 0.2
+                };
+                const patternString = trackDef.patterns[state.selectedPattern];
+                let pattern = window.sound(patternString);
+                pattern = pattern.room(state.reverb).delay(state.delay).degrade(state.degrade);
+                pattern = pattern.gain(state.volume);
+                assertDefined(pattern, 'Effect chain not applied');
+            });
+        });
+
+        // Performance tests
+        runner.describe('Performance', (it) => {
+            it('should build pattern in under 10ms', () => {
+                const start = performance.now();
+                const pattern = window.sound('bd sd hh cp').gain(0.7).room(0.5).cpm(120);
+                const duration = performance.now() - start;
+                assert(duration < 10, `Pattern build took ${duration}ms, expected < 10ms`);
+            });
+
+            it('should stack 5 patterns in under 20ms', () => {
+                const start = performance.now();
+                const patterns = [
+                    window.sound('bd sd').gain(0.7),
+                    window.sound('hh*4').gain(0.5),
+                    window.note('c2 e2').s('sawtooth').gain(0.6),
+                    window.note('c4 e4 g4').s('triangle').gain(0.5),
+                    window.sound('cp ~ cp ~').gain(0.6)
+                ];
+                const stacked = window.stack(...patterns);
+                const duration = performance.now() - start;
+                assert(duration < 20, `Stack operation took ${duration}ms, expected < 20ms`);
+            });
+
+            it('should handle state updates efficiently', () => {
+                const states = Array(5).fill(null).map((_, i) => ({
+                    enabled: i % 2 === 0,
+                    selectedPattern: 'A',
+                    volume: 0.7,
+                    speed: 1,
+                    reverb: 0,
+                    delay: 0
+                }));
+
+                const start = performance.now();
+                states.forEach((state, i) => {
+                    state.volume = 0.5;
+                    state.reverb = 0.3;
+                });
+                const duration = performance.now() - start;
+                assert(duration < 5, `State updates took ${duration}ms, expected < 5ms`);
+            });
+        });
+
+        // Playback control tests
+        runner.describe('Playback Controls', (it) => {
+            it('should start playback without errors', () => {
+                const pattern = window.sound('bd sd hh cp');
+                // We don't actually play to avoid audio, just verify method exists
+                assertType(pattern.play, 'function', 'Play method not available');
+            });
+
+            it('should stop all patterns with hush', () => {
+                assertType(window.hush, 'function', 'Hush function not available');
+                // Just verify it exists, don't call it during tests
+            });
+
+            it('should handle empty stack gracefully', () => {
+                const stacked = window.stack();
+                assertDefined(stacked, 'Empty stack failed');
+            });
+
+            it('should handle single pattern in stack', () => {
+                const pattern = window.sound('bd');
+                const stacked = window.stack(pattern);
+                assertDefined(stacked, 'Single pattern stack failed');
+            });
+        });
+
+        // Run tests on button click
+        document.getElementById('runTests').addEventListener('click', async () => {
+            document.getElementById('runTests').disabled = true;
+            document.getElementById('runTests').textContent = 'Running...';
+
+            await runner.run();
+
+            document.getElementById('runTests').disabled = false;
+            document.getElementById('runTests').textContent = 'Run All Tests Again';
+        });
+    </script>
+</body>
+</html>

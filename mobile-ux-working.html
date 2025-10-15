@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strudel Mobile - Working</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: monospace;
+            background: #0a0a0a;
+            color: #00ff88;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .status {
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid #00ff88;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+
+        .sequencer {
+            margin-bottom: 100px;
+        }
+
+        .track {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #00ff8833;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+        }
+
+        .track-name {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .step-grid {
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            gap: 4px;
+        }
+
+        .step {
+            aspect-ratio: 1;
+            background: #1a1a1a;
+            border: 2px solid #333;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .step.active {
+            background: #00ff88;
+            border-color: #00ff88;
+            box-shadow: 0 0 8px #00ff8888;
+        }
+
+        .transport {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #000;
+            border-top: 2px solid #00ff88;
+            padding: 16px;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            background: none;
+            border: 2px solid #00ff88;
+            color: #00ff88;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:active {
+            background: #00ff88;
+            color: #000;
+            transform: scale(0.95);
+        }
+
+        .btn.active {
+            background: #00ff88;
+            color: #000;
+        }
+
+        .tempo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tempo-value {
+            font-size: 18px;
+            font-weight: 900;
+            min-width: 60px;
+        }
+
+        input[type="range"] {
+            width: 120px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎵 STRUDEL MOBILE</h1>
+    </div>
+
+    <div class="status" id="status">Loading...</div>
+
+    <div class="sequencer">
+        <div class="track">
+            <div class="track-name">KICK</div>
+            <div class="step-grid" id="kick-grid"></div>
+        </div>
+
+        <div class="track">
+            <div class="track-name">SNARE</div>
+            <div class="step-grid" id="snare-grid"></div>
+        </div>
+
+        <div class="track">
+            <div class="track-name">HIHAT</div>
+            <div class="step-grid" id="hihat-grid"></div>
+        </div>
+    </div>
+
+    <div class="transport">
+        <button class="btn" id="playBtn">▶</button>
+        <button class="btn" id="stopBtn">■</button>
+        <div class="tempo">
+            <span>TEMPO</span>
+            <input type="range" id="tempoSlider" min="60" max="180" value="120">
+            <span class="tempo-value" id="tempoValue">120</span>
+        </div>
+    </div>
+
+    <script type="module">
+        const statusEl = document.getElementById('status');
+
+        function showStatus(msg) {
+            statusEl.textContent = msg;
+            console.log(msg);
+        }
+
+        try {
+            showStatus('Loading Strudel...');
+
+            // Import Strudel with the minimal required modules
+            const strudelCore = await import('https://esm.sh/@strudel/core@1.2.4');
+            const strudelWebaudio = await import('https://esm.sh/@strudel/webaudio@1.2.5');
+
+            const { Pattern, Hap } = strudelCore;
+            const { getAudioContext, initAudioOnFirstClick, samples } = strudelWebaudio;
+
+            showStatus('Strudel loaded! Tap steps to create patterns.');
+
+            // State
+            const state = {
+                tracks: {
+                    kick: [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],
+                    snare: [0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0],
+                    hihat: [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0]
+                },
+                isPlaying: false,
+                tempo: 120,
+                currentCycle: 0,
+                intervalId: null
+            };
+
+            // Audio context (initialize on first click)
+            let audioContext = null;
+            let audioInitialized = false;
+
+            async function initAudio() {
+                if (!audioInitialized) {
+                    await initAudioOnFirstClick();
+                    audioContext = getAudioContext();
+                    audioInitialized = true;
+                    console.log('Audio initialized');
+                }
+            }
+
+            // Render grids
+            function renderGrid(trackId) {
+                const container = document.getElementById(`${trackId}-grid`);
+                const pattern = state.tracks[trackId];
+
+                container.innerHTML = '';
+                pattern.forEach((val, idx) => {
+                    const step = document.createElement('div');
+                    step.className = `step ${val === 1 ? 'active' : ''}`;
+                    step.dataset.track = trackId;
+                    step.dataset.step = idx;
+                    container.appendChild(step);
+                });
+            }
+
+            renderGrid('kick');
+            renderGrid('snare');
+            renderGrid('hihat');
+
+            // Step toggle
+            document.addEventListener('click', async (e) => {
+                if (e.target.classList.contains('step')) {
+                    await initAudio(); // Initialize audio on first interaction
+
+                    const track = e.target.dataset.track;
+                    const step = parseInt(e.target.dataset.step);
+                    state.tracks[track][step] = state.tracks[track][step] === 0 ? 1 : 0;
+                    renderGrid(track);
+
+                    // Play preview of the sound
+                    if (state.tracks[track][step] === 1) {
+                        playSound(track);
+                    }
+                }
+            });
+
+            // Play a single sound (preview)
+            async function playSound(trackId) {
+                if (!audioContext) return;
+
+                const soundMap = {
+                    kick: 'bd',
+                    snare: 'sd',
+                    hihat: 'hh'
+                };
+
+                const soundName = soundMap[trackId];
+                const now = audioContext.currentTime;
+
+                try {
+                    // Load and play sample
+                    const sampleData = await samples(`github:tidalcycles/Dirt-Samples/master/${soundName}/0.wav`, audioContext);
+                    const source = audioContext.createBufferSource();
+                    source.buffer = sampleData;
+                    source.connect(audioContext.destination);
+                    source.start(now);
+                } catch (e) {
+                    console.error('Error playing sound:', e);
+                }
+            }
+
+            // Simple playback loop
+            async function startPlayback() {
+                await initAudio();
+
+                state.isPlaying = true;
+                document.getElementById('playBtn').classList.add('active');
+                showStatus('Playing...');
+
+                const stepDuration = (60 / state.tempo) / 4; // 16th notes
+                let currentStep = 0;
+
+                state.intervalId = setInterval(async () => {
+                    // Highlight current step
+                    document.querySelectorAll('.step').forEach(step => {
+                        step.classList.remove('playing');
+                    });
+
+                    // Play active steps
+                    for (const [trackId, pattern] of Object.entries(state.tracks)) {
+                        const stepEl = document.querySelector(`[data-track="${trackId}"][data-step="${currentStep}"]`);
+                        if (stepEl) {
+                            stepEl.classList.add('playing');
+                            setTimeout(() => stepEl.classList.remove('playing'), 100);
+                        }
+
+                        if (pattern[currentStep] === 1) {
+                            playSound(trackId);
+                        }
+                    }
+
+                    currentStep = (currentStep + 1) % 16;
+                }, stepDuration * 1000);
+            }
+
+            function stopPlayback() {
+                if (state.intervalId) {
+                    clearInterval(state.intervalId);
+                    state.intervalId = null;
+                }
+                state.isPlaying = false;
+                document.getElementById('playBtn').classList.remove('active');
+                document.querySelectorAll('.step').forEach(step => {
+                    step.classList.remove('playing');
+                });
+                showStatus('Stopped');
+            }
+
+            // Transport controls
+            document.getElementById('playBtn').addEventListener('click', () => {
+                if (state.isPlaying) {
+                    stopPlayback();
+                } else {
+                    startPlayback();
+                }
+            });
+
+            document.getElementById('stopBtn').addEventListener('click', () => {
+                stopPlayback();
+            });
+
+            // Tempo control
+            document.getElementById('tempoSlider').addEventListener('input', (e) => {
+                state.tempo = parseInt(e.target.value);
+                document.getElementById('tempoValue').textContent = state.tempo;
+
+                // Restart playback if playing
+                if (state.isPlaying) {
+                    stopPlayback();
+                    startPlayback();
+                }
+            });
+
+            // Add playing indicator style
+            const style = document.createElement('style');
+            style.textContent = `
+                .step.playing {
+                    background: #00ffff !important;
+                    border-color: #00ffff !important;
+                    box-shadow: 0 0 16px #00ffff !important;
+                    animation: pulse 0.2s;
+                }
+                @keyframes pulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.1); }
+                }
+            `;
+            document.head.appendChild(style);
+
+            console.log('✅ Ready! Tap steps to create patterns, then press PLAY.');
+
+        } catch (error) {
+            statusEl.textContent = 'Error: ' + error.message;
+            statusEl.style.background = 'rgba(255, 0, 0, 0.2)';
+            statusEl.style.borderColor = '#ff0044';
+            console.error('Fatal error:', error);
+        }
+    </script>
+</body>
+</html>
