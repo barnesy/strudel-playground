@@ -3921,7 +3921,7 @@
 
         document.getElementById('duplicatePresetBtn').addEventListener('click', () => {
             if (currentSelectedPreset) {
-                const newNum = getNextAvailablePresetNumber();
+                const newNum = getNextPresetNumber();
                 localStorage.setItem(`preset${newNum}`, localStorage.getItem(`preset${currentSelectedPreset}`));
                 generatePresetsUI();
                 selectPreset(newNum);

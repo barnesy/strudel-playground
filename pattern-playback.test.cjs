@@ -25,14 +25,13 @@ function test(name, condition, message) {
 }
 
 console.log('TEST 1: Pattern Update Frequency');
-// Check that patterns update at step 0 (start of 8-bar cycle), not every 16 steps
-const hasOldUpdatePattern = html.includes('if (currentStep % 16 === 0)');
-const hasNewUpdatePattern = html.includes('if (currentStep === 0)');
-
-test('Step Clock', !hasOldUpdatePattern, 'Old pattern update (every 16 steps) removed');
-test('Step Clock', hasNewUpdatePattern, 'New pattern update (at step 0 only) present');
-test('Comment', html.includes('Update patterns at the start of the full 8-bar cycle'), 'Comment explains 8-bar cycle');
-test('Comment', html.includes('This allows the full sequence to play through'), 'Comment explains purpose');
+// Patterns are checked every bar (every 16 steps). The hash guard inside
+// updatePatterns() ensures audio only restarts when the state actually changed,
+// so the full 128-step (8-bar) sequence plays through without glitching.
+// See smart-pattern-update.test.cjs for the full smart-update behavior.
+test('Step Clock', html.includes('if (currentStep % 16 === 0)'), 'Pattern update check runs every 16 steps (every bar)');
+test('Comment', html.includes('Update patterns every 16 steps'), 'Comment explains per-bar update');
+test('Step Clock', html.includes('const patternsChanged = stateHash !== lastPatternHash'), 'Audio only restarts when the state hash changes');
 console.log('');
 
 console.log('TEST 2: Constants and Configuration');
@@ -93,7 +92,7 @@ if (failCount === 0) {
     console.log('✓ Pattern playback should now play full 8 bars (128 steps)');
     console.log('✓ Pattern updates happen at:');
     console.log('  - Start of playback');
-    console.log('  - Start of each 8-bar cycle (step 0)');
+    console.log('  - Start of each bar (every 16 steps), restarting only on change');
     console.log('  - When user changes BPM, volume, speed, key, or mode');
     console.log('  - When user edits patterns');
     console.log('\n✓ The 1-bar repetition bug is FIXED!');

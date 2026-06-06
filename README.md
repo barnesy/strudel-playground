@@ -1,146 +1,101 @@
 # Strudel Playground
 
-A local development environment for experimenting with [Strudel](https://strudel.cc/), a live coding music environment for JavaScript.
+A browser-based step sequencer built on [Strudel](https://strudel.cc/), the
+JavaScript live-coding music environment (a port of Tidal Cycles).
 
-## What is Strudel?
+The project is two things:
 
-Strudel is a JavaScript port of Tidal Cycles, designed for creating music through code. It allows you to:
-- Live code music in real-time
-- Create algorithmic patterns
-- Manipulate sounds with effects
-- Learn music and coding simultaneously
+1. **`controller-v2.html` — the main app.** A full-featured, touch-friendly
+   step sequencer with multiple tracks, presets, a timeline, audio recording,
+   and a set of generative tools (Euclidean rhythms, pattern breeding, chord
+   builder, gesture morphing). It is a single self-contained HTML file that
+   loads Strudel from a CDN, so it runs without a build step.
+2. **`index.html` + `main.js` — a minimal example.** A tiny four-button demo
+   that loads Strudel via npm/ES modules. Useful as a starting point or a
+   reference for the Strudel API; not the main app.
 
 ## Getting Started
 
-### Running the Development Server
+### Run the main app
+
+`controller-v2.html` is self-contained. Serve the folder and open it:
 
 ```bash
-npm run dev
+npm install      # first time only
+npm run dev      # starts Vite, then open the printed URL + /controller-v2.html
 ```
 
-This will start a local development server (usually at `http://localhost:5173`). Open the URL in your browser to see the playground.
+You can also open `controller-v2.html` directly in a browser (it pulls Strudel
+from `unpkg.com`), but serving it over `http://` avoids browser restrictions on
+microphone access and audio.
 
-### Building for Production
+### Run the minimal example
+
+`npm run dev` serves the directory; open the root URL (`/`) to load
+`index.html` / `main.js`.
+
+### Build / preview (minimal example only)
 
 ```bash
-npm run build
+npm run build    # production build of the Vite example into dist/
+npm run preview  # preview the production build
 ```
 
-This creates an optimized production build in the `dist/` folder.
+> Note: the build pipeline only covers the `index.html` example. The main app
+> (`controller-v2.html`) is a standalone file and does not need a build.
 
-### Preview Production Build
+## Tests
+
+Tests are plain Node scripts (no framework). Each prints its own results and
+exits non-zero on failure. A small runner discovers and runs them all:
 
 ```bash
-npm run preview
+npm test                 # run every test file
+npm test -- pattern      # run only files whose path contains "pattern"
 ```
 
-Preview the production build locally before deploying.
+The suite covers the pure logic extracted from `controller-v2.html` (pattern
+generation, Euclidean rhythms, chord detection, quantization, the smart
+pattern-update system, mobile UX helpers, recording algorithms) plus
+source-structure checks against the HTML.
 
 ## Project Structure
 
 ```
 strudel-playground/
-├── index.html          # Main HTML file with UI
-├── main.js             # JavaScript with Strudel examples
-├── package.json        # Dependencies and scripts
-└── README.md          # This file
+├── controller-v2.html          # The main app (sequencer)
+├── index.html                  # Minimal Strudel example (UI)
+├── main.js                     # Minimal Strudel example (logic)
+├── run-tests.mjs               # Test runner (npm test)
+├── *.test.js / *.test.cjs      # Root-level tests
+├── tests/                      # Additional test suites
+├── CHANGELOG.md                # Feature history
+├── UX-INTEGRATION-GUIDE.md     # Notes on the UX feature set
+└── MOBILE-UX-DOCUMENTATION.md  # Notes on mobile UX
 ```
 
-## Using the Playground
+## Strudel Mini-Notation (quick reference)
 
-### Interactive Buttons
+The sequencer compiles to Strudel patterns. The underlying mini-notation:
 
-The playground includes 4 example buttons:
-1. **Example 1**: Simple drum pattern
-2. **Example 2**: Melodic pattern with piano sounds
-3. **Example 3**: Complex rhythm with room and delay effects
-4. **Example 4**: Bass line with low-pass filter modulation
+- `bd hh sd hh` — play sounds in sequence
+- `bd*2` — repeat a sound
+- `[bd sd]` — subdivision (both in one step)
+- `<bd sd hh>` — alternation (one per cycle)
+- `~` — rest (silence)
+- `bd sd, hh hh hh hh` — polyrhythm (layered patterns)
 
-Click any button to play the pattern. Use the "Stop All" button to silence everything.
-
-### Browser Console
-
-Open your browser's developer console to experiment with Strudel code directly:
-
-```javascript
-// Simple drum patterns
-sound("bd hh sd hh").play()
-
-// Melodic patterns
-note("c a f e").play()
-
-// With effects
-sound("bd sd").room(0.5).delay(0.25).play()
-
-// Complex patterns
-note("<c3 e3 g3 c4>").s("piano").slow(2).play()
-```
-
-### Mini-Notation Syntax
-
-Strudel uses "mini-notation" for creating patterns:
-
-- `bd hh sd hh` - Play sounds in sequence
-- `bd*2` - Repeat a sound (plays bd twice)
-- `[bd sd]` - Subdivision (play both in one step)
-- `<bd sd hh>` - Alternation (alternate each cycle)
-- `~` or `-` - Rest (silence)
-- `bd sd, hh hh hh hh` - Polyrhythm (layer patterns)
-
-### Example Patterns
-
-```javascript
-// Basic drums
-sound("bd sd").play()
-
-// Fast hi-hats
-sound("bd [~ sd] hh*4 [~ bd]").play()
-
-// Melody with effects
-note("c3 e3 g3 c4")
-  .s("piano")
-  .room(0.3)
-  .delay(0.125)
-  .play()
-
-// Bass line with filter sweep
-note("<c2 [e2 g2] a2 [f2 e2]>")
-  .s("sawtooth")
-  .lpf("<400 800 1200 2400>")
-  .play()
-
-// Stack multiple patterns
-stack(
-  sound("bd sd"),
-  sound("~ hh").fast(2),
-  note("c3 e3 g3").s("piano")
-).play()
-```
-
-## Modifying Examples
-
-Edit `main.js` to change or add new examples. The file includes:
-- Button event handlers for each example
-- Inline comments explaining the patterns
-- Additional pattern ideas in comments at the bottom
+Try patterns directly in the [Strudel REPL](https://strudel.cc/).
 
 ## Learn More
 
-- [Strudel Workshop](https://strudel.cc/workshop/getting-started/) - Interactive tutorials
-- [Strudel Documentation](https://strudel.cc/) - Full documentation
-- [Strudel REPL](https://strudel.cc/) - Online playground
-- [Tidal Cycles](https://tidalcycles.org/) - The original pattern language
+- [Strudel Workshop](https://strudel.cc/workshop/getting-started/) — tutorials
+- [Strudel Documentation](https://strudel.cc/)
+- [Tidal Cycles](https://tidalcycles.org/) — the original pattern language
 
-## License
+## Notes
 
-This project is set up for personal experimentation. Note that Strudel is open-source and requires derivative works to maintain open-source licensing.
-
-## Tips
-
-- Use headphones for the best audio experience
-- Start simple and gradually add complexity
-- Experiment with different sounds and effects
-- Check the browser console for errors if sounds don't play
-- Press Ctrl+C in the terminal to stop the dev server
-
-Happy live coding!
+- Strudel is open-source; derivative works are expected to remain open-source.
+- The main app currently loads Strudel from `unpkg.com/@strudel/web@latest`.
+  Pinning to a specific version is recommended for stability.
+- Use headphones for the best audio experience.
