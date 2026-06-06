@@ -1740,7 +1740,10 @@
         STRUDEL CONTROLLER v2.0 // TABS: SEQUENCER + TIMELINE + RECORD
     </div>
 
-    <script src="https://unpkg.com/@strudel/web@latest"></script>
+    <!-- Pinned to a known-good version; @latest can break on upstream API changes. -->
+    <script src="https://unpkg.com/@strudel/web@1.2.5"></script>
+    <!-- Shared pure helpers (Euclidean, chord detection, quantization, etc.). -->
+    <script src="/js/pattern-utils.js"></script>
     <script>
         // Configuration
         const STEPS_PER_BAR = 128; // 8 bars × 16 steps
@@ -1909,358 +1912,32 @@
         let animationFrameId = null;
 
         // ========================================================================
-        // RECORDING ALGORITHMS (from tested recording-audio.test.js)
-        // ========================================================================
-
-        /**
-         * Calculate the duration of a 16th note in milliseconds
-         * @param {number} bpm - Beats per minute
-         * @returns {number} Duration in milliseconds
-         */
-        function getSixteenthNoteDuration(bpm) {
-            return (60000 / bpm) / 4;
-        }
-
-        /**
-         * Quantize a timestamp to the nearest 16th note grid position
-         * @param {number} time - Time in milliseconds
-         * @param {number} bpm - Beats per minute
-         * @returns {number} Quantized time in milliseconds
-         */
-        function quantizeToGrid(time, bpm) {
-            const gridSize = getSixteenthNoteDuration(bpm);
-            return Math.round(time / gridSize) * gridSize;
-        }
-
-        /**
-         * Quantize with sensitivity (loose vs strict)
-         * @param {number} time - Time in milliseconds
-         * @param {number} bpm - Beats per minute
-         * @param {string} mode - 'off', 'loose', 'strict'
-         * @returns {number} Quantized time
-         */
-        function quantizeWithMode(time, bpm, mode = 'strict') {
-            if (mode === 'off') return time;
-
-            const gridSize = getSixteenthNoteDuration(bpm);
-            const nearestGrid = Math.round(time / gridSize) * gridSize;
-
-            if (mode === 'loose') {
-                const distance = Math.abs(time - nearestGrid);
-                const threshold = gridSize * 0.2; // 20% of grid size
-                return distance <= threshold ? nearestGrid : time;
-            }
-
-            return nearestGrid; // strict mode
-        }
-
-        /**
-         * Detect onsets (transients) in an audio buffer
-         * @param {Float32Array} audioData - Audio samples
-         * @param {number} sampleRate - Sample rate in Hz
-         * @param {number} threshold - Detection threshold (0-1)
-         * @returns {number[]} Array of onset times in milliseconds
-         */
-        function detectOnsets(audioData, sampleRate, threshold = 0.3) {
-            const onsets = [];
-            const windowSize = Math.floor(sampleRate * 0.01); // 10ms windows
-            const hopSize = Math.floor(windowSize / 2);
-
-            let previousEnergy = 0;
-
-            for (let i = 0; i < audioData.length - windowSize; i += hopSize) {
-                // Calculate energy in current window
-                let energy = 0;
-                for (let j = 0; j < windowSize; j++) {
-                    const sample = audioData[i + j];
-                    energy += sample * sample;
-                }
-                energy = Math.sqrt(energy / windowSize); // RMS
-
-                // Detect onset if energy increases significantly
-                if (energy > threshold && energy > previousEnergy * 1.5) {
-                    const timeMs = (i / sampleRate) * 1000;
-
-                    // Avoid duplicate detections (min 20ms apart)
-                    if (onsets.length === 0 || timeMs - onsets[onsets.length - 1] > 20) {
-                        onsets.push(Math.round(timeMs));
-                    }
-                }
-
-                previousEnergy = energy;
-            }
-
-            return onsets;
-        }
-
-        /**
-         * Slice audio buffer into segments based on onset times
-         * @param {Float32Array} audioData - Full audio buffer
-         * @param {number[]} onsets - Onset times in milliseconds
-         * @param {number} sampleRate - Sample rate in Hz
-         * @returns {Float32Array[]} Array of audio slices
-         */
-        function sliceAudioByOnsets(audioData, onsets, sampleRate) {
-            if (onsets.length === 0) return [audioData];
-
-            const slices = [];
-
-            for (let i = 0; i < onsets.length; i++) {
-                const startTime = onsets[i];
-                const endTime = i < onsets.length - 1 ? onsets[i + 1] : (audioData.length / sampleRate) * 1000;
-
-                const startSample = Math.floor((startTime / 1000) * sampleRate);
-                const endSample = Math.floor((endTime / 1000) * sampleRate);
-
-                const slice = audioData.slice(startSample, endSample);
-                slices.push(slice);
-            }
-
-            return slices;
-        }
-
-        /**
-         * Convert millisecond time to 16-step grid position (0-15)
-         * @param {number} timeMs - Time in milliseconds
-         * @param {number} bpm - Beats per minute
-         * @returns {number} Step position (0-15)
-         */
-        function timeToStepPosition(timeMs, bpm) {
-            const sixteenthDuration = getSixteenthNoteDuration(bpm);
-            const position = Math.floor(timeMs / sixteenthDuration) % 16;
-            return position;
-        }
-
-        // ========================================================================
-        // NEW UX FEATURES ALGORITHMS (from ux-features.test.js)
-        // ========================================================================
-
-        // 1. EUCLIDEAN RHYTHM GENERATOR
-        /**
-         * Generate Euclidean rhythm pattern using Bjorklund algorithm
-         * @param {number} hits - Number of hits to distribute
-         * @param {number} steps - Total number of steps
-         * @returns {number[]} Pattern array (1 = hit, 0 = rest)
-         */
-        function generateEuclidean(hits, steps) {
-            if (hits >= steps) return new Array(steps).fill(1);
-            if (hits === 0) return new Array(steps).fill(0);
-
-            // Bjorklund algorithm implementation
-            const pattern = [];
-            const counts = [];
-            const remainders = [];
-
-            let divisor = steps - hits;
-            remainders.push(hits);
-
-            let level = 0;
-            while (true) {
-                counts.push(Math.floor(divisor / remainders[level]));
-                remainders.push(divisor % remainders[level]);
-                divisor = remainders[level];
-                level++;
-                if (remainders[level] <= 1) break;
-            }
-
-            counts.push(divisor);
-
-            // Build the pattern
-            const build = (level) => {
-                if (level === -1) {
-                    pattern.push(0);
-                } else if (level === -2) {
-                    pattern.push(1);
-                } else {
-                    for (let i = 0; i < counts[level]; i++) {
-                        build(level - 1);
-                    }
-                    if (remainders[level] !== 0) {
-                        build(level - 2);
-                    }
-                }
-            };
-
-            build(level);
-            return pattern.slice(0, steps);
-        }
-
-        /**
-         * Rotate pattern by N steps
-         */
-        function rotatePattern(pattern, rotate) {
-            const r = rotate % pattern.length;
-            return [...pattern.slice(r), ...pattern.slice(0, r)];
-        }
-
-        // 3. PATTERN GENETICS
-        /**
-         * Breed two patterns using crossover and mutation
-         */
-        function breedPatterns(patternA, patternB, mutationRate = 0.05) {
-            const offspring = [];
-            const crossoverPoint = Math.floor(Math.random() * patternA.length);
-
-            for (let i = 0; i < patternA.length; i++) {
-                // Crossover: take from A before crossover point, B after
-                offspring[i] = i < crossoverPoint ? patternA[i] : patternB[i];
-
-                // Mutation: random flip
-                if (Math.random() < mutationRate) {
-                    offspring[i] = offspring[i] ? 0 : 1;
-                }
-            }
-
-            return offspring;
-        }
-
-        // 4. MULTI-TOUCH CHORD DETECTION
-        /**
-         * Calculate intervals between notes
-         */
-        function calculateIntervals(notes) {
-            const noteValues = {'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5,
-                               'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11};
-
-            const values = notes.map(n => noteValues[n]).sort((a, b) => a - b);
-            const intervals = [];
-
-            for (let i = 1; i < values.length; i++) {
-                intervals.push(values[i] - values[i-1]);
-            }
-
-            return intervals;
-        }
-
-        /**
-         * Detect chord type from notes
-         */
-        function detectChord(notes) {
-            if (notes.length < 2) return 'Single Note';
-            if (notes.length === 2) {
-                const intervals = calculateIntervals(notes);
-                if (intervals[0] === 7) return 'Perfect Fifth';
-                if (intervals[0] === 5) return 'Perfect Fourth';
-                if (intervals[0] === 4) return 'Major Third';
-                if (intervals[0] === 3) return 'Minor Third';
-                return 'Interval';
-            }
-
-            if (notes.length === 3) {
-                const intervals = calculateIntervals(notes);
-                if (intervals[0] === 4 && intervals[1] === 3) return 'Major';
-                if (intervals[0] === 3 && intervals[1] === 4) return 'Minor';
-                if (intervals[0] === 3 && intervals[1] === 3) return 'Diminished';
-                if (intervals[0] === 4 && intervals[1] === 4) return 'Augmented';
-            }
-
-            return 'Complex';
-        }
-
-        // 6. GESTURE MORPHING
-        /**
-         * Morph between two patterns based on blend ratio
-         */
-        function morphPatterns(patternA, patternB, blendRatio) {
-            // blendRatio: 0 = all A, 1 = all B
-            const morphed = [];
-
-            for (let i = 0; i < Math.min(patternA.length, patternB.length); i++) {
-                // Probabilistic morphing
-                const useB = Math.random() < blendRatio;
-                morphed.push(useB ? patternB[i] : patternA[i]);
-            }
-
-            return morphed;
-        }
-
-        /**
-         * Calculate blend ratio from Y position
-         */
-        function yPositionToBlendRatio(y, canvasHeight) {
-            return Math.max(0, Math.min(1, y / canvasHeight));
-        }
-
-        // 7. MOTION CONTROL MAPPING
-        /**
-         * Map tilt angle to parameter range
-         */
-        function mapRange(value, inMin, inMax, outMin, outMax) {
-            const clamped = Math.max(inMin, Math.min(inMax, value));
-            return (clamped - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
-        }
-
-        /**
-         * Map device tilt to filter cutoff
-         */
-        function tiltToFilterCutoff(tilt) {
-            return mapRange(tilt, -45, 45, 200, 5000);
-        }
-
-        /**
-         * Map device tilt to volume
-         */
-        function tiltToVolume(tilt) {
-            return mapRange(tilt, -45, 45, 0, 1);
-        }
-
-        // 8. VOICE-TO-PATTERN CONVERSION
-        /**
-         * Convert onset times to sequencer pattern
-         */
-        function onsetsToPattern(onsets, bpm, patternLength = STEPS_PER_BAR) {
-            const pattern = Array(patternLength).fill(0);
-            const sixteenthDuration = (60000 / bpm) / 4;
-            const barDuration = sixteenthDuration * patternLength;
-
-            onsets.forEach(onset => {
-                const step = Math.floor((onset % barDuration) / sixteenthDuration);
-                if (step < patternLength) {
-                    pattern[step] = 1;
-                }
-            });
-
-            return pattern;
-        }
-
-        /**
-         * Quantize onset times to grid
-         */
-        function quantizeOnsets(onsets, bpm) {
-            const sixteenthDuration = (60000 / bpm) / 4;
-            return onsets.map(onset => {
-                return Math.round(onset / sixteenthDuration) * sixteenthDuration;
-            });
-        }
-
-        // 9. COLOR HARMONY MAPPING
-        /**
-         * Map color wheel angle (0-360°) to musical note
-         */
-        function angleToNote(angle) {
-            const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-            const normalizedAngle = ((angle % 360) + 360) % 360; // Handle negative angles
-            const noteIndex = Math.floor((normalizedAngle / 360) * 12);
-            return noteNames[noteIndex];
-        }
-
-        /**
-         * Detect harmony relationship between angles
-         */
-        function detectHarmonyRelation(angles) {
-            if (angles.length < 2) return 'Single';
-
-            const sorted = angles.map(a => ((a % 360) + 360) % 360).sort((a, b) => a - b);
-            const interval = Math.abs(sorted[1] - sorted[0]);
-
-            if (Math.abs(interval - 180) < 15) return 'Tritone';
-            if (Math.abs(interval - 210) < 15) return 'Perfect Fifth';
-            if (Math.abs(interval - 150) < 15) return 'Perfect Fourth';
-            if (Math.abs(interval - 120) < 15) return 'Major Third';
-            if (Math.abs(interval - 90) < 15) return 'Minor Third';
-
-            return 'Custom';
-        }
+        // Pure helpers (Euclidean, chord detection, quantization, onset
+        // detection, etc.) live in /js/pattern-utils.js as window.StrudelUtils,
+        // shared with the test suite. Pull them into local scope so the rest of
+        // this script calls them unqualified, exactly as before.
+        const {
+            getSixteenthNoteDuration,
+            quantizeToGrid,
+            quantizeWithMode,
+            detectOnsets,
+            sliceAudioByOnsets,
+            timeToStepPosition,
+            generateEuclidean,
+            rotatePattern,
+            breedPatterns,
+            calculateIntervals,
+            detectChord,
+            morphPatterns,
+            yPositionToBlendRatio,
+            mapRange,
+            tiltToFilterCutoff,
+            tiltToVolume,
+            onsetsToPattern,
+            quantizeOnsets,
+            angleToNote,
+            detectHarmonyRelation,
+        } = window.StrudelUtils;
 
         // Dynamic preset colors
         const PRESET_COLORS = [
