@@ -1,5 +1,7 @@
 # Strudel Playground
 
+[![CI](https://github.com/barnesy/strudel-playground/actions/workflows/ci.yml/badge.svg)](https://github.com/barnesy/strudel-playground/actions/workflows/ci.yml)
+
 A browser-based step sequencer built on [Strudel](https://strudel.cc/), the
 JavaScript live-coding music environment (a port of Tidal Cycles).
 
