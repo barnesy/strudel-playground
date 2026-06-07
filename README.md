@@ -1,146 +1,150 @@
 # Strudel Playground
 
-A local development environment for experimenting with [Strudel](https://strudel.cc/), a live coding music environment for JavaScript.
+[![CI](https://github.com/barnesy/strudel-playground/actions/workflows/ci.yml/badge.svg)](https://github.com/barnesy/strudel-playground/actions/workflows/ci.yml)
 
-## What is Strudel?
+A browser-based step sequencer built on [Strudel](https://strudel.cc/), the
+JavaScript live-coding music environment (a port of Tidal Cycles).
 
-Strudel is a JavaScript port of Tidal Cycles, designed for creating music through code. It allows you to:
-- Live code music in real-time
-- Create algorithmic patterns
-- Manipulate sounds with effects
-- Learn music and coding simultaneously
+The project is two things:
+
+1. **`controller-v2.html` — the main app.** A full-featured, touch-friendly
+   step sequencer with multiple tracks, presets, a timeline, audio recording,
+   and a set of generative tools (Euclidean rhythms, pattern breeding, chord
+   builder, gesture morphing). It is a single self-contained HTML file that
+   loads Strudel from a CDN, so it runs without a build step.
+2. **`index.html` + `main.js` — a minimal example.** A tiny four-button demo
+   that loads Strudel via npm/ES modules. Useful as a starting point or a
+   reference for the Strudel API; not the main app.
 
 ## Getting Started
 
-### Running the Development Server
+### Run the main app
 
 ```bash
-npm run dev
+npm install      # first time only
+npm run dev      # starts Vite; open the printed URL + /controller-v2.html
 ```
 
-This will start a local development server (usually at `http://localhost:5173`). Open the URL in your browser to see the playground.
+Locally the dev server serves the example at `/` and the app at
+`/controller-v2.html`. (On Vercel a rewrite makes `/` serve the app — see
+Deploying below.) Serving over `localhost` rather than opening the file
+directly keeps audio and microphone access working.
 
-### Building for Production
+### Run the minimal example
+
+With `npm run dev` running, open the root URL (`/`) for `index.html` / `main.js`.
+
+### Build / preview
 
 ```bash
-npm run build
+npm run build    # multi-page production build into dist/
+npm run preview  # preview the production build locally
 ```
 
-This creates an optimized production build in the `dist/` folder.
+The build is multi-page (see `vite.config.js`): it emits both
+`controller-v2.html` (the app) and `index.html` (the example), and copies
+`public/` verbatim — including the shared `js/pattern-utils.js` helper module.
 
-### Preview Production Build
+## Deploying (Vercel)
+
+`vercel.json` configures the deploy:
+
+- **Build command:** `vite build`  →  **Output:** `dist/`
+- **Redirect:** `/` redirects to the app (`/controller-v2.html`); the minimal
+  example stays reachable at `/index.html`. (A redirect is used rather than a
+  rewrite because Vercel serves a matching static file — here `index.html` — at
+  `/` before rewrites are evaluated, so a rewrite on `/` would never fire.)
+
+Pushing a branch to a Vercel-connected repo produces a **preview URL** served
+over HTTPS — the easiest way to test on a phone (audio and microphone require a
+secure context, which `https://` and `localhost` both provide).
+
+## Testing locally on a phone (e.g. Pixel Fold)
+
+Audio/mic need a *secure context*: `https://` or `localhost`. Three options,
+easiest first:
+
+1. **Vercel preview URL** — open the preview link in Chrome on the phone. Real
+   HTTPS, nothing to install. Best for the full app + microphone recording.
+2. **Dev server on the phone (Termux).** In the repo:
+   ```bash
+   npm install
+   npm run dev -- --host       # then open the printed http://localhost:5173/
+   ```
+   Open `/controller-v2.html` for the app. `localhost` counts as secure, so
+   audio/mic work.
+3. **Dev server on a laptop, phone on same Wi‑Fi.** Run `npm run dev -- --host`
+   and open the `http://<laptop-ip>:5173/` "Network" URL on the phone. Note:
+   a plain `http://<ip>` origin is **not** a secure context, so microphone
+   recording will be blocked there — playback still works. Use option 1 or 2
+   if you need to test recording.
+
+After it loads: tap a control once to unlock the AudioContext (browsers require
+a user gesture before audio can start), then press play.
+
+## Tests
+
+Tests are plain Node scripts (no framework). Each prints its own results and
+exits non-zero on failure. A small runner discovers and runs them all:
 
 ```bash
-npm run preview
+npm test                 # run every test file
+npm test -- pattern      # run only files whose path contains "pattern"
 ```
 
-Preview the production build locally before deploying.
+The suite covers the shared pure helpers in `public/js/pattern-utils.js`
+(Euclidean rhythms, chord detection, quantization, onset detection, range
+mapping), pattern generation, the smart pattern-update system, mobile UX
+helpers, and recording algorithms — plus source-structure checks against the
+HTML.
 
 ## Project Structure
 
 ```
 strudel-playground/
-├── index.html          # Main HTML file with UI
-├── main.js             # JavaScript with Strudel examples
-├── package.json        # Dependencies and scripts
-└── README.md          # This file
+├── controller-v2.html          # The main app (sequencer)
+├── index.html                  # Minimal Strudel example (UI)
+├── main.js                     # Minimal Strudel example (logic)
+├── public/
+│   └── js/pattern-utils.js     # Shared pure helpers (app + tests)
+├── vite.config.js              # Multi-page build config
+├── vercel.json                 # Deploy config
+├── run-tests.mjs               # Test runner (npm test)
+├── *.test.js / *.test.cjs      # Root-level tests
+├── tests/                      # Additional test suites
+├── CHANGELOG.md                # Feature history
+├── UX-INTEGRATION-GUIDE.md     # Notes on the UX feature set
+└── MOBILE-UX-DOCUMENTATION.md  # Notes on mobile UX
 ```
 
-## Using the Playground
+> The app pulls these helpers in via `window.StrudelUtils` (a classic
+> `<script src="/js/pattern-utils.js">`), so the same code runs in the browser
+> and under Node in the tests. This is the first step of breaking the
+> single-file app into modules; more of `controller-v2.html` can follow the
+> same pattern.
 
-### Interactive Buttons
+## Strudel Mini-Notation (quick reference)
 
-The playground includes 4 example buttons:
-1. **Example 1**: Simple drum pattern
-2. **Example 2**: Melodic pattern with piano sounds
-3. **Example 3**: Complex rhythm with room and delay effects
-4. **Example 4**: Bass line with low-pass filter modulation
+The sequencer compiles to Strudel patterns. The underlying mini-notation:
 
-Click any button to play the pattern. Use the "Stop All" button to silence everything.
+- `bd hh sd hh` — play sounds in sequence
+- `bd*2` — repeat a sound
+- `[bd sd]` — subdivision (both in one step)
+- `<bd sd hh>` — alternation (one per cycle)
+- `~` — rest (silence)
+- `bd sd, hh hh hh hh` — polyrhythm (layered patterns)
 
-### Browser Console
-
-Open your browser's developer console to experiment with Strudel code directly:
-
-```javascript
-// Simple drum patterns
-sound("bd hh sd hh").play()
-
-// Melodic patterns
-note("c a f e").play()
-
-// With effects
-sound("bd sd").room(0.5).delay(0.25).play()
-
-// Complex patterns
-note("<c3 e3 g3 c4>").s("piano").slow(2).play()
-```
-
-### Mini-Notation Syntax
-
-Strudel uses "mini-notation" for creating patterns:
-
-- `bd hh sd hh` - Play sounds in sequence
-- `bd*2` - Repeat a sound (plays bd twice)
-- `[bd sd]` - Subdivision (play both in one step)
-- `<bd sd hh>` - Alternation (alternate each cycle)
-- `~` or `-` - Rest (silence)
-- `bd sd, hh hh hh hh` - Polyrhythm (layer patterns)
-
-### Example Patterns
-
-```javascript
-// Basic drums
-sound("bd sd").play()
-
-// Fast hi-hats
-sound("bd [~ sd] hh*4 [~ bd]").play()
-
-// Melody with effects
-note("c3 e3 g3 c4")
-  .s("piano")
-  .room(0.3)
-  .delay(0.125)
-  .play()
-
-// Bass line with filter sweep
-note("<c2 [e2 g2] a2 [f2 e2]>")
-  .s("sawtooth")
-  .lpf("<400 800 1200 2400>")
-  .play()
-
-// Stack multiple patterns
-stack(
-  sound("bd sd"),
-  sound("~ hh").fast(2),
-  note("c3 e3 g3").s("piano")
-).play()
-```
-
-## Modifying Examples
-
-Edit `main.js` to change or add new examples. The file includes:
-- Button event handlers for each example
-- Inline comments explaining the patterns
-- Additional pattern ideas in comments at the bottom
+Try patterns directly in the [Strudel REPL](https://strudel.cc/).
 
 ## Learn More
 
-- [Strudel Workshop](https://strudel.cc/workshop/getting-started/) - Interactive tutorials
-- [Strudel Documentation](https://strudel.cc/) - Full documentation
-- [Strudel REPL](https://strudel.cc/) - Online playground
-- [Tidal Cycles](https://tidalcycles.org/) - The original pattern language
+- [Strudel Workshop](https://strudel.cc/workshop/getting-started/) — tutorials
+- [Strudel Documentation](https://strudel.cc/)
+- [Tidal Cycles](https://tidalcycles.org/) — the original pattern language
 
-## License
+## Notes
 
-This project is set up for personal experimentation. Note that Strudel is open-source and requires derivative works to maintain open-source licensing.
-
-## Tips
-
-- Use headphones for the best audio experience
-- Start simple and gradually add complexity
-- Experiment with different sounds and effects
-- Check the browser console for errors if sounds don't play
-- Press Ctrl+C in the terminal to stop the dev server
-
-Happy live coding!
+- Strudel is open-source; derivative works are expected to remain open-source.
+- The main app loads Strudel from `unpkg.com/@strudel/web@1.2.5` (pinned for
+  stability; bump deliberately and re-test after upgrading).
+- Use headphones for the best audio experience.

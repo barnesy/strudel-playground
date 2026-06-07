@@ -4,6 +4,11 @@
  */
 
 // Test utilities
+let hadFailure = false;
+function fail(message) {
+    hadFailure = true;
+    console.error(message);
+}
 function assert(condition, message) {
     if (!condition) {
         throw new Error(`Assertion failed: ${message}`);
@@ -73,7 +78,7 @@ try {
     console.log('✓ Required record elements present\n');
 
 } catch (error) {
-    console.error('✗ HTML Structure test failed:', error.message);
+    fail('✗ HTML Structure test failed:', error.message);
     console.log('Note: This test requires jsdom. Run: npm install jsdom\n');
 }
 
@@ -102,7 +107,7 @@ try {
     console.log('✓ Record button CSS preserved\n');
 
 } catch (error) {
-    console.error('✗ CSS validation test failed:', error.message + '\n');
+    fail('✗ CSS validation test failed:', error.message + '\n');
 }
 
 // ========================================================================
@@ -121,7 +126,7 @@ try {
     assertEqual(getSixteenthNoteDuration(180), 83.33333333333333, '16th note at 180 BPM should be ~83.33ms');
     console.log('✓ getSixteenthNoteDuration works correctly');
 } catch (error) {
-    console.error('✗ getSixteenthNoteDuration test failed:', error.message);
+    fail('✗ getSixteenthNoteDuration test failed:', error.message);
 }
 
 // Test quantizeToGrid
@@ -136,7 +141,7 @@ try {
     assertEqual(quantizeToGrid(0, 120), 0, 'Should quantize 0ms to 0ms');
     console.log('✓ quantizeToGrid works correctly');
 } catch (error) {
-    console.error('✗ quantizeToGrid test failed:', error.message);
+    fail('✗ quantizeToGrid test failed:', error.message);
 }
 
 // Test quantizeWithMode
@@ -173,7 +178,7 @@ try {
 
     console.log('✓ quantizeWithMode works correctly\n');
 } catch (error) {
-    console.error('✗ quantizeWithMode test failed:', error.message + '\n');
+    fail('✗ quantizeWithMode test failed:', error.message + '\n');
 }
 
 // ========================================================================
@@ -236,7 +241,7 @@ try {
     console.log(`  Detected ${onsets.length} onset(s) at: ${onsets.join(', ')}ms\n`);
 
 } catch (error) {
-    console.error('✗ detectOnsets test failed:', error.message + '\n');
+    fail('✗ detectOnsets test failed:', error.message + '\n');
 }
 
 // ========================================================================
@@ -263,3 +268,9 @@ console.log('6. Verify waveform appears');
 console.log('7. Verify sample appears in library');
 console.log('8. Test quantization modes (OFF/LOOSE/STRICT)');
 console.log('9. Verify no console errors');
+
+if (hadFailure) {
+    console.log('\n✗ SOME TESTS FAILED');
+    process.exit(1);
+}
+process.exit(0);
