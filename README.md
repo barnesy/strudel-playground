@@ -50,8 +50,10 @@ The build is multi-page (see `vite.config.js`): it emits both
 `vercel.json` configures the deploy:
 
 - **Build command:** `vite build`  →  **Output:** `dist/`
-- **Rewrite:** `/` serves the app (`/controller-v2.html`); the minimal example
-  stays reachable at `/index.html`.
+- **Redirect:** `/` redirects to the app (`/controller-v2.html`); the minimal
+  example stays reachable at `/index.html`. (A redirect is used rather than a
+  rewrite because Vercel serves a matching static file — here `index.html` — at
+  `/` before rewrites are evaluated, so a rewrite on `/` would never fire.)
 
 Pushing a branch to a Vercel-connected repo produces a **preview URL** served
 over HTTPS — the easiest way to test on a phone (audio and microphone require a
